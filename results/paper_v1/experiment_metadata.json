@@ -1,0 +1,92 @@
+{
+  "created_at": "2026-08-17T23:48:45.707547+00:00",
+  "dataset_source": "UCI Parkinson's Disease Classification dataset 470 (checksum-verified cached mirror)",
+  "primary_conformal_method": "mondrian_lac",
+  "primary_alpha": 0.1,
+  "conformal_probability_source": "uncalibrated_subject_mean_probability",
+  "probability_calibration_analysis": [
+    "uncalibrated",
+    "sigmoid",
+    "isotonic"
+  ],
+  "dataset_provenance": {
+    "uci_dataset_page": "https://archive.ics.uci.edu/dataset/470/parkinson+s+disease+classification",
+    "csv_mirror_url": "https://huggingface.co/datasets/wwydmanski/ParkinsonsDisease/resolve/main/pd_speech_features.csv?download=true",
+    "observed_sha256": "9495d1100beaa24005ea951d4b6588186091de4c21cc45009b027f38f699b8ab",
+    "verified_mirror_sha256": "9495d1100beaa24005ea951d4b6588186091de4c21cc45009b027f38f699b8ab",
+    "checksum_matches_verified_mirror": true,
+    "structural_validation": "756 recordings, 252 subjects, required columns, finite acoustic features"
+  },
+  "recordings": 756,
+  "subjects": 252,
+  "acoustic_features": 752,
+  "selected_model": "extra_trees",
+  "selection_metric": "patient-level grouped-CV ROC-AUC",
+  "cross_validation_folds": 5,
+  "split_counts": {
+    "train": {
+      "subjects": 151,
+      "recordings": 453
+    },
+    "calibration": {
+      "subjects": 50,
+      "recordings": 150
+    },
+    "test": {
+      "subjects": 51,
+      "recordings": 153
+    }
+  },
+  "config": {
+    "data_path": null,
+    "output_dir": "artifacts",
+    "calibration_size": 0.2,
+    "test_size": 0.2,
+    "cv_folds": 5,
+    "random_state": 42,
+    "selected_models": null,
+    "alpha_levels": [
+      0.05,
+      0.1,
+      0.2
+    ],
+    "primary_alpha": 0.1,
+    "bootstrap_replicates": 2000,
+    "leakage_repeats": 5,
+    "results_dir": "results/paper_v1",
+    "save_plots": true,
+    "save_paper_outputs": true,
+    "save_model": true
+  },
+  "analysis_definition": {
+    "primary_conformal_method": "class-conditional (Mondrian) LAC",
+    "primary_alpha": 0.1,
+    "primary_target_coverage": 0.9,
+    "conformal_probability_source": "uncalibrated subject-level aggregate probabilities",
+    "calibration_methods": [
+      "uncalibrated",
+      "Platt scaling",
+      "isotonic regression"
+    ],
+    "classification_probability_source": "reported separately for raw, Platt-scaled, and isotonic probabilities",
+    "aggregation_conformal_source": "each strategy's own uncalibrated subject-level probability",
+    "bootstrap_unit": "subject",
+    "bootstrap_replicates": 2000,
+    "bootstrap_confidence_level": 0.95,
+    "bootstrap_interval_method": "percentile",
+    "bootstrap_random_state": 42,
+    "evaluation_status": "held-out development evaluation"
+  },
+  "probability_variables": {
+    "raw_conformal_calibration_probs": "raw selected-model mean probability for each calibration subject",
+    "raw_conformal_test_probs": "raw selected-model mean probability for each held-out development subject",
+    "platt_calibration_probs": "parallel Platt-scaled calibration-subject probability; not used for conformal scores",
+    "platt_test_probs": "parallel Platt-scaled development-subject probability used for calibrated classification summaries",
+    "isotonic_test_probs": "parallel isotonic development-subject probability used only for calibrated classification summaries"
+  },
+  "limitations": [
+    "Single public dataset",
+    "Sex is the only available demographic subgroup",
+    "Research use only; no clinical validation"
+  ]
+}

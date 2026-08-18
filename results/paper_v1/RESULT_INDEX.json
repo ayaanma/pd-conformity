@@ -1,0 +1,26 @@
+{
+  "version": "paper_v1",
+  "purpose": "Compact, version-controlled source tables for every reported result",
+  "generated_from": "artifacts",
+  "files": [
+    "aggregation_results.csv",
+    "calibration_results.csv",
+    "conformal_results.csv",
+    "cross_validation_fold_scores.csv",
+    "dataset_and_split.csv",
+    "experiment_metadata.json",
+    "leakage_sensitivity.csv",
+    "model_comparison.csv",
+    "selective_risk_curve.csv",
+    "subgroup_results.csv",
+    "test_subject_predictions.csv"
+  ],
+  "row_lookup": {
+    "model_selection": "model_comparison.csv: selected_model row",
+    "calibration": "calibration_results.csv: selected_model and method rows",
+    "primary_conformal": "conformal_results.csv: method=mondrian_lac and alpha=0.1",
+    "aggregation": "aggregation_results.csv: one row per strategy",
+    "subgroups": "subgroup_results.csv: one row per sex or diagnosis subgroup",
+    "leakage": "leakage_sensitivity.csv: protocol and repeat rows"
+  }
+}

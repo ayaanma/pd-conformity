@@ -76,6 +76,92 @@ def conformal_metrics(y_true: np.ndarray, prediction_sets: np.ndarray) -> dict[s
     }
 
 
+def _percentile_interval(values: list[float]) -> tuple[float, float]:
+    finite = np.asarray(values, dtype=float)
+    finite = finite[np.isfinite(finite)]
+    if finite.size == 0:
+        return np.nan, np.nan
+    low, high = np.percentile(finite, [2.5, 97.5])
+    return float(low), float(high)
+
+
+def bootstrap_classification_intervals(
+    y_true: np.ndarray,
+    probabilities: np.ndarray,
+    replicates: int = 2000,
+    random_state: int = 42,
+) -> dict[str, float]:
+    """Subject-bootstrap 95% intervals for key classification metrics."""
+
+    if replicates < 1:
+        raise ValueError("replicates must be at least one.")
+    y_true = np.asarray(y_true, dtype=int)
+    probabilities = np.clip(np.asarray(probabilities, dtype=float), 0, 1)
+    if len(y_true) != len(probabilities) or len(y_true) == 0:
+        raise ValueError("Labels and probabilities must be non-empty and aligned.")
+    rng = np.random.default_rng(random_state)
+    samples: dict[str, list[float]] = {
+        "accuracy": [],
+        "balanced_accuracy": [],
+        "roc_auc": [],
+        "brier": [],
+    }
+    for _ in range(replicates):
+        indices = rng.integers(0, len(y_true), len(y_true))
+        labels = y_true[indices]
+        scores = probabilities[indices]
+        predicted = (scores >= 0.5).astype(int)
+        samples["accuracy"].append(float(np.mean(predicted == labels)))
+        samples["brier"].append(float(np.mean((scores - labels) ** 2)))
+        if np.unique(labels).size == 2:
+            samples["balanced_accuracy"].append(
+                float(balanced_accuracy_score(labels, predicted))
+            )
+            samples["roc_auc"].append(float(roc_auc_score(labels, scores)))
+    intervals: dict[str, float] = {}
+    for metric, values in samples.items():
+        low, high = _percentile_interval(values)
+        intervals[f"{metric}_ci_low"] = low
+        intervals[f"{metric}_ci_high"] = high
+    return intervals
+
+
+def bootstrap_conformal_intervals(
+    y_true: np.ndarray,
+    prediction_sets: np.ndarray,
+    replicates: int = 2000,
+    random_state: int = 42,
+) -> dict[str, float]:
+    """Subject-bootstrap 95% intervals for coverage and selective metrics."""
+
+    if replicates < 1:
+        raise ValueError("replicates must be at least one.")
+    y_true = np.asarray(y_true, dtype=int)
+    prediction_sets = np.asarray(prediction_sets, dtype=bool)
+    if prediction_sets.shape != (len(y_true), 2) or len(y_true) == 0:
+        raise ValueError("Prediction sets must have shape (subjects, 2).")
+    rng = np.random.default_rng(random_state)
+    samples: dict[str, list[float]] = {
+        "coverage": [],
+        "abstention_rate": [],
+        "selective_accuracy": [],
+        "selective_balanced_accuracy": [],
+    }
+    for _ in range(replicates):
+        indices = rng.integers(0, len(y_true), len(y_true))
+        metrics = conformal_metrics(y_true[indices], prediction_sets[indices])
+        for metric in samples:
+            value = float(metrics[metric])
+            if np.isfinite(value):
+                samples[metric].append(value)
+    intervals: dict[str, float] = {}
+    for metric, values in samples.items():
+        low, high = _percentile_interval(values)
+        intervals[f"{metric}_ci_low"] = low
+        intervals[f"{metric}_ci_high"] = high
+    return intervals
+
+
 def wilson_interval(successes: int, total: int, confidence: float = 0.95) -> tuple[float, float]:
     if total == 0:
         return np.nan, np.nan

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 from urllib.request import Request, urlopen
 
@@ -20,6 +21,7 @@ CSV_MIRROR_URL = (
     "main/pd_speech_features.csv?download=true"
 )
 DEFAULT_CACHE_PATH = Path("data/pd_speech_features.csv")
+EXPECTED_CSV_SHA256 = "9495d1100beaa24005ea951d4b6588186091de4c21cc45009b027f38f699b8ab"
 
 
 @dataclass(frozen=True)
@@ -31,6 +33,15 @@ class VoiceDataset:
     groups: pd.Series
     demographics: pd.DataFrame
     source: str
+    sha256: str
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _read_uci470_csv(path: Path) -> pd.DataFrame:
@@ -48,7 +59,7 @@ def _read_uci470_csv(path: Path) -> pd.DataFrame:
     )
 
 
-def _from_frame(frame: pd.DataFrame, source: str) -> VoiceDataset:
+def _from_frame(frame: pd.DataFrame, source: str, sha256: str) -> VoiceDataset:
     required = {"id", "gender", "class"}
     missing = required.difference(frame.columns)
     if missing:
@@ -92,6 +103,7 @@ def _from_frame(frame: pd.DataFrame, source: str) -> VoiceDataset:
         groups=groups.reset_index(drop=True),
         demographics=demographics.reset_index(drop=True),
         source=source,
+        sha256=sha256,
     )
 
 
@@ -102,6 +114,12 @@ def _download_csv(destination: Path) -> None:
     try:
         with urlopen(request, timeout=60) as response, temporary.open("wb") as output:
             output.write(response.read())
+        observed_sha256 = file_sha256(temporary)
+        if observed_sha256 != EXPECTED_CSV_SHA256:
+            raise ValueError(
+                "Downloaded CSV checksum does not match the verified UCI 470 mirror: "
+                f"expected {EXPECTED_CSV_SHA256}, observed {observed_sha256}."
+            )
         temporary.replace(destination)
     except Exception:
         temporary.unlink(missing_ok=True)
@@ -118,7 +136,7 @@ def load_voice_dataset(
         path = Path(csv_path).expanduser().resolve()
         if not path.is_file():
             raise FileNotFoundError(f"Dataset not found: {path}")
-        return _from_frame(_read_uci470_csv(path), str(path))
+        return _from_frame(_read_uci470_csv(path), str(path), file_sha256(path))
 
     path = Path(cache_path).expanduser().resolve()
     if not path.is_file():
@@ -129,9 +147,19 @@ def load_voice_dataset(
                 "Could not download the UCI 470 CSV mirror. Download "
                 f"pd_speech_features.csv from {UCI_DATASET_PAGE} and pass --data."
             ) from exc
+    observed_sha256 = file_sha256(path)
+    if observed_sha256 != EXPECTED_CSV_SHA256:
+        raise ValueError(
+            "The cached automatic-download dataset failed checksum validation: "
+            f"expected {EXPECTED_CSV_SHA256}, observed {observed_sha256}. "
+            "Delete the cached file so it can be downloaded again, or pass a "
+            "separately obtained UCI CSV with --data."
+        )
     dataset = _from_frame(
         _read_uci470_csv(path),
-        f"UCI Parkinson's Disease Classification dataset 470 (cached at {path})",
+        "UCI Parkinson's Disease Classification dataset 470 "
+        "(checksum-verified cached mirror)",
+        observed_sha256,
     )
     if len(dataset.target) != 756 or dataset.groups.nunique() != 252:
         raise ValueError(
